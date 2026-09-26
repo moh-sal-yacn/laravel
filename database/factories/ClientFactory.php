@@ -13,9 +13,9 @@ class ClientFactory extends Factory
     public function definition(): array
     {
         return [
-            'client_kind' => fake()->randomElement(['individual', 'company']),
-            'national_id' => fake()->unique()->numerify('##########'),
-            'users_id' => User::factory()->client(),
+            'client_kind'  => fake()->randomElement(['individual', 'company']),
+            'national_id'  => fake()->unique()->numerify('##########'), // رقم هوية وهمي (10 أرقام)
+            'users_id'     => User::factory()->client(),
         ];
     }
 }

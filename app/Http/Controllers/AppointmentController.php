@@ -6,18 +6,37 @@ use App\Models\Appointment;
 use App\Models\Booking;
 use App\Models\Client;
 use App\Models\User;
+use App\Notifications\AppointmentReminder;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
 use Illuminate\View\View;
 
 class AppointmentController extends Controller
 {
-    public function index(): View
+    public function index(Request $request): View
     {
         $appointments = Appointment::with(['booking', 'lawyer', 'client.user'])
-            ->latest('appointment_date')->paginate(15);
+            // ─── الفلاتر ───
+            ->when($request->filled('search'), function ($q) use ($request) {
+                $search = $request->search;
+                $q->where(fn ($sub) => $sub->where('notes', 'like', "%{$search}%")
+                                            ->orWhereHas('lawyer', fn ($u) => $u->where('name', 'like', "%{$search}%"))
+                                            ->orWhereHas('client.user', fn ($u) => $u->where('name', 'like', "%{$search}%")));
+            })
+            ->when($request->filled('status'), fn ($q) => $q->where('status', $request->status))
+            ->when($request->filled('lawyer'), fn ($q) => $q->where('users_id', $request->lawyer))
+            ->when($request->filled('client'), fn ($q) => $q->where('clients_id', $request->client))
+            ->when($request->filled('date_from'), fn ($q) => $q->whereDate('appointment_date', '>=', $request->date_from))
+            ->when($request->filled('date_to'), fn ($q) => $q->whereDate('appointment_date', '<=', $request->date_to))
+            ->latest('appointment_date')
+            ->paginate(15)
+            ->withQueryString();
 
-        return view('cms.appointments.index', compact('appointments'));
+        // ─── بيانات الفلاتر ───
+        $lawyers = User::where('user_type', 'lawyer')->orderBy('name')->get();
+        $clients = Client::with('user')->orderBy('id')->get();
+
+        return view('cms.appointments.index', compact('appointments', 'lawyers', 'clients'));
     }
 
     public function create(): View
@@ -33,13 +52,21 @@ class AppointmentController extends Controller
     {
         $data = $request->validate([
             'appointment_date' => 'required|date',
-            'status' => 'required|in:مجدول,مكتمل,ملغي',
-            'bookings_id' => 'nullable|exists:bookings,id',
-            'users_id' => 'required|exists:users,id',
-            'clients_id' => 'required|exists:clients,id',
+            'status'           => 'required|in:مجدول,مكتمل,ملغي',
+            'bookings_id'      => 'nullable|exists:bookings,id',
+            'users_id'         => 'required|exists:users,id',
+            'clients_id'       => 'required|exists:clients,id',
         ]);
 
-        Appointment::create($data);
+        $appointment = Appointment::create($data);
+
+        if ($appointment->lawyer) {
+            $appointment->lawyer->notify(new AppointmentReminder($appointment));
+        }
+
+        if ($appointment->client?->user) {
+            $appointment->client->user->notify(new AppointmentReminder($appointment));
+        }
 
         return redirect()->route('appointments.index')->with('success', 'تم إنشاء الموعد بنجاح.');
     }
@@ -47,7 +74,6 @@ class AppointmentController extends Controller
     public function show(Appointment $appointment): View
     {
         $appointment->load(['booking', 'lawyer', 'client.user']);
-
         return view('cms.appointments.show', compact('appointment'));
     }
 
@@ -64,10 +90,10 @@ class AppointmentController extends Controller
     {
         $data = $request->validate([
             'appointment_date' => 'required|date',
-            'status' => 'required|in:مجدول,مكتمل,ملغي',
-            'bookings_id' => 'nullable|exists:bookings,id',
-            'users_id' => 'required|exists:users,id',
-            'clients_id' => 'required|exists:clients,id',
+            'status'           => 'required|in:مجدول,مكتمل,ملغي',
+            'bookings_id'      => 'nullable|exists:bookings,id',
+            'users_id'         => 'required|exists:users,id',
+            'clients_id'       => 'required|exists:clients,id',
         ]);
 
         $appointment->update($data);
@@ -78,7 +104,6 @@ class AppointmentController extends Controller
     public function destroy(Appointment $appointment): RedirectResponse
     {
         $appointment->delete();
-
         return redirect()->route('appointments.index')->with('success', 'تم حذف الموعد.');
     }
 }

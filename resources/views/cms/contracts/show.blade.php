@@ -32,7 +32,13 @@
                 </dl>
             </div>
             <div class="card-footer bg-white">
-                <a href="{{ route('contracts.edit', $contract) }}" class="btn btn-sm btn-outline-warning"><i class="bi bi-pencil"></i> تعديل العقد</a>
+            <a href="{{ route('contracts.pdf', $contract) }}" class="btn btn-sm btn-light">
+                <i class="bi bi-file-pdf text-danger"></i> PDF
+            </a>
+            <a href="{{ route('contracts.invoice', $contract) }}" class="btn btn-sm btn-light">
+                <i class="bi bi-receipt text-warning"></i> فاتورة
+            </a>
+            <a href="{{ route('contracts.edit', $contract) }}" class="btn btn-sm btn-outline-warning"><i class="bi bi-pencil"></i> تعديل العقد</a>
             </div>
         </div>
     </div>

@@ -10,17 +10,28 @@ class UserSeeder extends Seeder
 {
     public function run(): void
     {
+        // ────── مدير النظام (حساب افتراضي) ──────
         $admin = User::factory()->admin()->create([
-            'name' => 'مدير النظام',
-            'email' => 'admin@lawfirm.test',
+            'name'     => 'مدير النظام',
+            'email'    => 'admin@lawfirm.test',
+            'password' => bcrypt('password'), // الافتراضي
         ]);
-        $admin->roles()->sync([Role::where('role_name', 'Admin')->value('id')]);
+        $admin->roles()->sync([
+            Role::where('role_name', 'مدير النظام')->value('id'),
+        ]);
 
+        // ────── المحامون (5 محامين) ──────
         $lawyers = User::factory()->lawyer()->count(5)->create();
-        $lawyerRoleId = Role::where('role_name', 'Lawyer')->value('id');
+        $lawyerRoleId = Role::where('role_name', 'محامي')->value('id');
         $lawyers->each(fn ($u) => $u->roles()->sync([$lawyerRoleId]));
 
-        // 10 additional generic users (mixed roles handled by the factory itself)
-        User::factory()->count(10)->create();
+        // ────── الموظفون الإداريون (2) ──────
+        $staff = User::factory()->count(2)->create(['user_type' => 'staff']);
+        $staffRoleId = Role::where('role_name', 'موظف إداري')->value('id');
+        $staff->each(fn ($u) => $u->roles()->sync([$staffRoleId]));
+
+        // ────── مستخدمون متنوعون (5 - موكلون ومحامون إضافيون) ──────
+        // ملاحظة: المستخدمون من نوع "client" يُنشأون لاحقاً في ClientSeeder
+        User::factory()->count(5)->create();
     }
 }

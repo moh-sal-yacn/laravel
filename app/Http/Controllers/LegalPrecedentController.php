@@ -10,10 +10,27 @@ use Illuminate\View\View;
 
 class LegalPrecedentController extends Controller
 {
-    public function index(): View
+    /**
+     * عرض قائمة السوابق مع الفلاتر
+     */
+    public function index(Request $request): View
     {
-        $precedents = LegalPrecedent::with('case')->latest('ruling_date')->paginate(15);
-        $cases = CourtCase::all();
+        $precedents = LegalPrecedent::with('case')
+            // ─── الفلاتر ───
+            ->when($request->filled('search'), function ($q) use ($request) {
+                $search = $request->search;
+                $q->where(fn ($sub) => $sub->where('title', 'like', "%{$search}%")
+                                            ->orWhere('summary', 'like', "%{$search}%"));
+            })
+            ->when($request->filled('source'), fn ($q) => $q->where('source', $request->source))
+            ->when($request->filled('case'), fn ($q) => $q->where('cases_id', $request->case))
+            ->when($request->filled('ruling_from'), fn ($q) => $q->whereDate('ruling_date', '>=', $request->ruling_from))
+            ->when($request->filled('ruling_to'), fn ($q) => $q->whereDate('ruling_date', '<=', $request->ruling_to))
+            ->latest('ruling_date')
+            ->paginate(15)
+            ->withQueryString();
+
+        $cases = CourtCase::orderBy('case_number')->get();
 
         return view('cms.legal_precedents.index', compact('precedents', 'cases'));
     }

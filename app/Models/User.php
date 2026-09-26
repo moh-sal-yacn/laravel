@@ -7,11 +7,12 @@ use Illuminate\Database\Eloquent\Relations\BelongsToMany;
 use Illuminate\Database\Eloquent\Relations\HasMany;
 use Illuminate\Database\Eloquent\Relations\HasOne;
 use Illuminate\Foundation\Auth\User as Authenticatable;
+use Illuminate\Database\Eloquent\SoftDeletes;
 use Illuminate\Notifications\Notifiable;
 
 class User extends Authenticatable
 {
-    use HasFactory, Notifiable;
+    use HasFactory, Notifiable, SoftDeletes;
 
     protected $table = 'users';
 
@@ -98,5 +99,60 @@ class User extends Authenticatable
     public function hasRole(string $roleName): bool
     {
         return $this->roles()->where('role_name', $roleName)->exists();
+    }
+        /**
+     * التحقق من امتلاك أحد الأدوار المحددة
+     */
+    public function hasAnyRole(array $roleNames): bool
+    {
+        return $this->roles()->whereIn('role_name', $roleNames)->exists();
+    }
+
+    /**
+     * التحقق من امتلاك صلاحية محددة (عبر أي دور)
+     */
+    public function hasPermission(string $permissionName): bool
+    {
+        return $this->roles()
+            ->whereHas('permissions', function ($q) use ($permissionName) {
+                $q->where('permission_name', $permissionName);
+            })
+            ->exists();
+    }
+
+    /**
+     * التحقق من امتلاك أي صلاحية من القائمة
+     */
+    public function hasAnyPermission(array $permissionNames): bool
+    {
+        return $this->roles()
+            ->whereHas('permissions', function ($q) use ($permissionNames) {
+                $q->whereIn('permission_name', $permissionNames);
+            })
+            ->exists();
+    }
+
+    /**
+     * التحقق من أن المستخدم مدير نظام
+     */
+    public function isAdmin(): bool
+    {
+        return $this->hasRole('مدير النظام') || $this->user_type === 'admin';
+    }
+
+    /**
+     * التحقق من أن المستخدم موكل
+     */
+    public function isClient(): bool
+    {
+        return $this->hasRole('موكل') || $this->user_type === 'client';
+    }
+
+    /**
+     * التحقق من أن المستخدم محامي
+     */
+    public function isLawyer(): bool
+    {
+        return $this->hasRole('محامي') || $this->user_type === 'lawyer';
     }
 }

@@ -8,12 +8,13 @@ use Illuminate\Database\Eloquent\Relations\BelongsTo;
 use Illuminate\Database\Eloquent\Relations\BelongsToMany;
 use Illuminate\Database\Eloquent\Relations\HasMany;
 use Illuminate\Database\Eloquent\Relations\MorphMany;
+use Illuminate\Database\Eloquent\SoftDeletes;
+use Spatie\Activitylog\LogOptions;
+use Spatie\Activitylog\Traits\LogsActivity;
 
-// Maps to the "cases" table. Named CourtCase in PHP because `case` is a reserved
-// keyword and cannot be used as a class name.
 class CourtCase extends Model
 {
-    use HasFactory;
+    use HasFactory, LogsActivity, SoftDeletes;
 
     protected $table = 'cases';
 
@@ -30,6 +31,26 @@ class CourtCase extends Model
         ];
     }
 
+    // ═══════════════ Activity Log ═══════════════
+    public function getActivitylogOptions(): LogOptions
+    {
+        return LogOptions::defaults()
+            ->logOnly([
+                'case_number', 'case_title', 'case_status',
+                'description', 'clients_id', 'courts_id', 'categories_id',
+            ])
+            ->logOnlyDirty()
+            ->dontSubmitEmptyLogs()
+            ->useLogName('cases')
+            ->setDescriptionForEvent(fn (string $eventName) => match ($eventName) {
+                'created' => 'أنشأ القضية',
+                'updated' => 'عدّل القضية',
+                'deleted' => 'حذف القضية',
+                default   => $eventName,
+            });
+    }
+
+    // ═══════════════ العلاقات ═══════════════
     public function client(): BelongsTo
     {
         return $this->belongsTo(Client::class, 'clients_id');
